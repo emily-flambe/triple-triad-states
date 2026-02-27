@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Triple Triad: Card Gallery</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  header {
+    text-align: center;
+    padding: 32px 16px 16px;
+  }
+
+  header h1 {
+    font-size: 1.8rem;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+
+  header p {
+    color: #888;
+    margin-top: 4px;
+    font-size: 0.9rem;
+  }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .card {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #2a2a4a;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+  }
+
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  }
+
+  .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .card-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 24px 10px 10px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    text-align: center;
+  }
+
+  .card-label .name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+
+  .card-label .elements {
+    margin-top: 4px;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .element-badge {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .element-badge.ocean    { background: #1a6b8a; color: #b3e0f2; }
+  .element-badge.mountain { background: #6b5b3a; color: #d4c5a0; }
+  .element-badge.desert   { background: #8a6b1a; color: #f2e0b3; }
+  .element-badge.plain    { background: #3a6b1a; color: #c0e0a0; }
+  .element-badge.swamp    { background: #2a5a4a; color: #a0d4c0; }
+  .element-badge.forest   { background: #1a5a2a; color: #a0d4a8; }
+
+  .card-id {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.7);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+
+  /* Lightbox */
+  .lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0,0,0,0.9);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .lightbox.active {
+    display: flex;
+  }
+
+  .lightbox img {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+  }
+
+  .lightbox .lightbox-label {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+  }
+
+  @media (max-width: 600px) {
+    .gallery {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      padding: 12px;
+    }
+    header h1 { font-size: 1.3rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Triple Triad: United States</h1>
+  <p>Card Gallery &mdash; 50 States</p>
+</header>
+
+<div class="gallery" id="gallery"></div>
+
+<div class="lightbox" id="lightbox">
+  <img id="lightbox-img" src="" alt="">
+  <div class="lightbox-label" id="lightbox-label"></div>
+</div>
+
+<script>
+const CARDS = [
+  { id: 1,  name: 'Alabama',        elements: ['forest', 'plain'] },
+  { id: 2,  name: 'Alaska',         elements: ['mountain', 'ocean'] },
+  { id: 3,  name: 'Arizona',        elements: ['desert', 'mountain'] },
+  { id: 4,  name: 'Arkansas',       elements: ['forest', 'swamp'] },
+  { id: 5,  name: 'California',     elements: ['ocean', 'mountain'] },
+  { id: 6,  name: 'Colorado',       elements: ['mountain', 'plain'] },
+  { id: 7,  name: 'Connecticut',    elements: ['ocean', 'forest'] },
+  { id: 8,  name: 'Delaware',       elements: ['ocean', 'swamp'] },
+  { id: 9,  name: 'Florida',        elements: ['ocean', 'swamp'] },
+  { id: 10, name: 'Georgia',        elements: ['forest', 'ocean'] },
+  { id: 11, name: 'Hawaii',         elements: ['ocean', 'forest'] },
+  { id: 12, name: 'Idaho',          elements: ['mountain', 'forest'] },
+  { id: 13, name: 'Illinois',       elements: ['plain', 'forest'] },
+  { id: 14, name: 'Indiana',        elements: ['plain', 'forest'] },
+  { id: 15, name: 'Iowa',           elements: ['plain', 'forest'] },
+  { id: 16, name: 'Kansas',         elements: ['plain', 'desert'] },
+  { id: 17, name: 'Kentucky',       elements: ['forest', 'mountain'] },
+  { id: 18, name: 'Louisiana',      elements: ['swamp', 'ocean'] },
+  { id: 19, name: 'Maine',          elements: ['ocean', 'forest'] },
+  { id: 20, name: 'Maryland',       elements: ['ocean', 'forest'] },
+  { id: 21, name: 'Massachusetts',  elements: ['ocean', 'forest'] },
+  { id: 22, name: 'Michigan',       elements: ['forest', 'ocean'] },
+  { id: 23, name: 'Minnesota',      elements: ['forest', 'plain'] },
+  { id: 24, name: 'Mississippi',    elements: ['swamp', 'forest'] },
+  { id: 25, name: 'Missouri',       elements: ['plain', 'forest'] },
+  { id: 26, name: 'Montana',        elements: ['mountain', 'plain'] },
+  { id: 27, name: 'Nebraska',       elements: ['plain', 'desert'] },
+  { id: 28, name: 'Nevada',         elements: ['desert', 'mountain'] },
+  { id: 29, name: 'New Hampshire',  elements: ['mountain', 'forest'] },
+  { id: 30, name: 'New Jersey',     elements: ['ocean', 'swamp'] },
+  { id: 31, name: 'New Mexico',     elements: ['desert', 'mountain'] },
+  { id: 32, name: 'New York',       elements: ['ocean', 'mountain'] },
+  { id: 33, name: 'North Carolina', elements: ['ocean', 'mountain'] },
+  { id: 34, name: 'North Dakota',   elements: ['plain'] },
+  { id: 35, name: 'Ohio',           elements: ['plain', 'forest'] },
+  { id: 36, name: 'Oklahoma',       elements: ['plain', 'desert'] },
+  { id: 37, name: 'Oregon',         elements: ['ocean', 'forest'] },
+  { id: 38, name: 'Pennsylvania',   elements: ['mountain', 'forest'] },
+  { id: 39, name: 'Rhode Island',   elements: ['ocean'] },
+  { id: 40, name: 'South Carolina', elements: ['ocean', 'swamp'] },
+  { id: 41, name: 'South Dakota',   elements: ['plain', 'mountain'] },
+  { id: 42, name: 'Tennessee',      elements: ['mountain', 'forest'] },
+  { id: 43, name: 'Texas',          elements: ['desert', 'plain'] },
+  { id: 44, name: 'Utah',           elements: ['desert', 'mountain'] },
+  { id: 45, name: 'Vermont',        elements: ['mountain', 'forest'] },
+  { id: 46, name: 'Virginia',       elements: ['ocean', 'mountain'] },
+  { id: 47, name: 'Washington',     elements: ['ocean', 'mountain'] },
+  { id: 48, name: 'West Virginia',  elements: ['mountain', 'forest'] },
+  { id: 49, name: 'Wisconsin',      elements: ['forest', 'plain'] },
+  { id: 50, name: 'Wyoming',        elements: ['mountain', 'plain'] },
+];
+
+function getImagePath(card) {
+  const padId = String(card.id).padStart(2, '0');
+  const slug = card.name.toLowerCase().replace(/\s+/g, '-');
+  return `/images/cards/bordered/${padId}-${slug}.png`;
+}
+
+const gallery = document.getElementById('gallery');
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+const lightboxLabel = document.getElementById('lightbox-label');
+
+CARDS.forEach(card => {
+  const div = document.createElement('div');
+  div.className = 'card';
+
+  const img = document.createElement('img');
+  img.src = getImagePath(card);
+  img.alt = card.name;
+  img.loading = 'lazy';
+
+  const idSpan = document.createElement('div');
+  idSpan.className = 'card-id';
+  idSpan.textContent = `#${card.id}`;
+
+  const label = document.createElement('div');
+  label.className = 'card-label';
+
+  const name = document.createElement('div');
+  name.className = 'name';
+  name.textContent = card.name;
+
+  const elements = document.createElement('div');
+  elements.className = 'elements';
+  card.elements.forEach(e => {
+    const badge = document.createElement('span');
+    badge.className = `element-badge ${e}`;
+    badge.textContent = e;
+    elements.appendChild(badge);
+  });
+
+  label.appendChild(name);
+  label.appendChild(elements);
+  div.appendChild(img);
+  div.appendChild(idSpan);
+  div.appendChild(label);
+
+  div.addEventListener('click', () => {
+    lightboxImg.src = getImagePath(card);
+    lightboxLabel.textContent = card.name;
+    lightbox.classList.add('active');
+  });
+
+  gallery.appendChild(div);
+});
+
+lightbox.addEventListener('click', () => {
+  lightbox.classList.remove('active');
+});
+</script>
+
+</body>
+</html>
