@@ -158,8 +158,18 @@
       background-size: cover;
       background-position: center;
     }
-    .card.owner-0 { box-shadow: 0 0 8px 2px rgba(74, 158, 255, 0.7); }
-    .card.owner-1 { box-shadow: 0 0 8px 2px rgba(255, 74, 74, 0.7); }
+    .card::after, .hand-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .card.owner-0, .hand-card.owner-0 { box-shadow: 0 0 8px 2px rgba(74, 158, 255, 0.7); }
+    .card.owner-1, .hand-card.owner-1 { box-shadow: 0 0 8px 2px rgba(255, 74, 74, 0.7); }
+    .owner-0::after { background: rgba(30, 100, 220, 0.3); }
+    .owner-1::after { background: rgba(220, 40, 40, 0.3); }
 
     /* Stat number overlays */
     .stat {
@@ -208,8 +218,7 @@
       transform: scale(1.08);
       box-shadow: 0 0 12px var(--accent) !important;
     }
-    .hand-card.owner-0 { box-shadow: 0 0 8px 2px rgba(74, 158, 255, 0.7); }
-    .hand-card.owner-1 { box-shadow: 0 0 8px 2px rgba(255, 74, 74, 0.7); }
+    .hand-card.facedown::after { background: none; }
 
     /* Opponent hand (face down) */
     .hand-card.facedown {
