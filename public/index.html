@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Triple Triad: United States</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --bg2: #16213e;
+      --accent: #e94560;
+      --accent2: #0f3460;
+      --text: #eee;
+      --text-dim: #888;
+      --p0-color: #4a9eff;
+      --p1-color: #ff4a4a;
+      --card-bg: #2a2a4a;
+      --card-border: #444;
+      --cell-bg: #222244;
+      --cell-hover: #333366;
+      --ocean: #2196F3;
+      --mountain: #795548;
+      --desert: #FF9800;
+      --plain: #8BC34A;
+      --swamp: #4CAF50;
+      --forest: #2E7D32;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin: 16px 0 4px;
+      font-size: 1.6em;
+      letter-spacing: 1px;
+    }
+    .subtitle {
+      color: var(--text-dim);
+      font-size: 0.85em;
+      margin-bottom: 12px;
+    }
+
+    /* Lobby */
+    #lobby {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-top: 40px;
+      padding: 32px;
+      background: var(--bg2);
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+    }
+    #lobby h2 { font-size: 1.3em; margin-bottom: 8px; }
+    #lobby input {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      color: var(--text);
+      font-size: 1em;
+      width: 240px;
+      text-align: center;
+    }
+    #lobby button {
+      padding: 12px 32px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-size: 1em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    #lobby button:hover { transform: scale(1.05); }
+    #lobby button:active { transform: scale(0.95); }
+
+    /* Game area */
+    #game { display: none; width: 100%; max-width: 900px; padding: 0 12px; }
+    #game.active { display: block; }
+
+    /* Status bar */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      background: var(--bg2);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 0.95em;
+    }
+    .status-bar .score {
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+    .score-p0 { color: var(--p0-color); }
+    .score-p1 { color: var(--p1-color); }
+    .status-text { color: var(--text); text-align: center; flex: 1; }
+    .turn-indicator { font-weight: bold; }
+
+    /* Main game layout */
+    .game-layout {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    /* Board */
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      width: 360px;
+      height: 360px;
+      background: var(--accent2);
+      padding: 4px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .cell {
+      background: var(--cell-bg);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .cell:hover:not(.occupied) { background: var(--cell-hover); }
+    .cell.valid-target { box-shadow: inset 0 0 0 2px var(--accent); }
+    .cell.captured { animation: captureFlash 0.4s ease-out; }
+
+    @keyframes captureFlash {
+      0% { filter: brightness(2); }
+      100% { filter: brightness(1); }
+    }
+
+    /* Cards */
+    .card {
+      width: 100%;
+      height: 100%;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      font-size: 0.8em;
+      transition: all 0.2s;
+    }
+    .card.owner-0 { background: linear-gradient(135deg, #1a3a6a, #2a4a8a); border: 2px solid var(--p0-color); }
+    .card.owner-1 { background: linear-gradient(135deg, #5a1a1a, #7a2a2a); border: 2px solid var(--p1-color); }
+
+    .card-name {
+      font-size: 0.65em;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 2px;
+      max-width: 90%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-values {
+      display: grid;
+      grid-template-areas:
+        ". top ."
+        "left center right"
+        ". bottom .";
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr 1fr;
+      width: 60px;
+      height: 50px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 1.1em;
+    }
+    .card-values .v-top { grid-area: top; }
+    .card-values .v-right { grid-area: right; }
+    .card-values .v-bottom { grid-area: bottom; }
+    .card-values .v-left { grid-area: left; }
+    .card-values .v-center { grid-area: center; font-size: 0.5em; color: var(--text-dim); display: flex; align-items: center; justify-content: center; }
+
+    .card-elements {
+      display: flex;
+      gap: 3px;
+      margin-top: 1px;
+    }
+    .element-badge {
+      font-size: 0.55em;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .element-badge.ocean { background: var(--ocean); }
+    .element-badge.mountain { background: var(--mountain); }
+    .element-badge.desert { background: var(--desert); color: #333; }
+    .element-badge.plain { background: var(--plain); color: #333; }
+    .element-badge.swamp { background: var(--swamp); }
+    .element-badge.forest { background: var(--forest); }
+
+    /* Hand */
+    .hand-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 140px;
+    }
+    .hand-panel h3 {
+      text-align: center;
+      font-size: 0.85em;
+      margin-bottom: 4px;
+    }
+    .hand-card {
+      width: 130px;
+      height: 100px;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      font-size: 0.8em;
+      transition: all 0.15s;
+    }
+    .hand-card:hover { transform: scale(1.05); }
+    .hand-card.selected {
+      transform: scale(1.08);
+      box-shadow: 0 0 12px var(--accent);
+    }
+    .hand-card.owner-0 { background: linear-gradient(135deg, #1a3a6a, #2a4a8a); border: 2px solid var(--p0-color); }
+    .hand-card.owner-1 { background: linear-gradient(135deg, #5a1a1a, #7a2a2a); border: 2px solid var(--p1-color); }
+
+    .hand-card .card-values {
+      width: 70px;
+      height: 55px;
+    }
+
+    /* Opponent hand (face down) */
+    .hand-card.facedown {
+      background: repeating-linear-gradient(
+        45deg,
+        var(--card-bg),
+        var(--card-bg) 5px,
+        #333355 5px,
+        #333355 10px
+      ) !important;
+    }
+
+    /* Element advantages reference */
+    .element-ref {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--bg2);
+      border-radius: 8px;
+      font-size: 0.75em;
+      line-height: 1.6;
+    }
+    .element-ref h4 { margin-bottom: 6px; font-size: 0.95em; }
+    .element-ref .adv-row { display: flex; align-items: center; gap: 4px; margin: 2px 0; }
+
+    /* Result overlay */
+    .result-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .result-overlay.active { display: flex; }
+    .result-box {
+      background: var(--bg2);
+      padding: 40px;
+      border-radius: 16px;
+      text-align: center;
+      border: 2px solid var(--accent);
+    }
+    .result-box h2 { font-size: 2em; margin-bottom: 12px; }
+    .result-box .final-score { font-size: 1.5em; margin-bottom: 20px; }
+    .result-box button {
+      padding: 12px 32px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-size: 1em;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .result-box button:hover { transform: scale(1.05); }
+
+    /* Waiting overlay */
+    .waiting-overlay {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 10;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-size: 1.1em;
+    }
+    .waiting-overlay.active { display: flex; }
+
+    /* Toast messages */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: white;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-weight: bold;
+      z-index: 200;
+      animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in 2s forwards;
+    }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
+    @keyframes toastOut { to { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
+
+    .room-info {
+      font-size: 0.8em;
+      color: var(--text-dim);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 700px) {
+      .game-layout { flex-direction: column; align-items: center; }
+      .hand-panel { flex-direction: row; flex-wrap: wrap; width: 100%; justify-content: center; }
+      .hand-panel h3 { width: 100%; }
+      .board { width: 300px; height: 300px; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Triple Triad: United States</h1>
+  <p class="subtitle">A card game of state-vs-state elemental combat</p>
+
+  <!-- Lobby -->
+  <div id="lobby">
+    <h2>Join a Game</h2>
+    <input id="playerName" placeholder="Your name" maxlength="20" />
+    <input id="roomCode" placeholder="Room code (or leave blank)" maxlength="20" />
+    <button onclick="joinGame()">Play</button>
+    <p style="font-size:0.8em; color:var(--text-dim); max-width:280px; text-align:center; margin-top:8px;">
+      Share the room code with a friend to play together, or leave blank for a random room.
+    </p>
+  </div>
+
+  <!-- Game -->
+  <div id="game">
+    <div class="room-info">Room: <span id="roomDisplay"></span></div>
+    <div class="status-bar">
+      <span class="score score-p0">P1: <span id="score0">5</span></span>
+      <span class="status-text" id="statusText">Waiting for opponent...</span>
+      <span class="score score-p1">P2: <span id="score1">5</span></span>
+    </div>
+
+    <div class="game-layout">
+      <!-- My hand (left) -->
+      <div class="hand-panel" id="myHandPanel">
+        <h3 id="myHandTitle">Your Hand</h3>
+        <div id="myHand"></div>
+      </div>
+
+      <!-- Board -->
+      <div class="board" id="board" style="position:relative;">
+        <!-- 9 cells generated by JS -->
+        <div class="waiting-overlay" id="waitingOverlay">Waiting for opponent...</div>
+      </div>
+
+      <!-- Opponent hand (right) -->
+      <div class="hand-panel" id="oppHandPanel">
+        <h3 id="oppHandTitle">Opponent</h3>
+        <div id="oppHand"></div>
+      </div>
+    </div>
+
+    <!-- Element Reference -->
+    <div class="element-ref">
+      <h4>Elemental Advantages (+1 bonus to side values)</h4>
+      <div class="adv-row"><span class="element-badge ocean">Ocean</span> beats <span class="element-badge desert">Desert</span> & <span class="element-badge forest">Forest</span></div>
+      <div class="adv-row"><span class="element-badge mountain">Mountain</span> beats <span class="element-badge ocean">Ocean</span> & <span class="element-badge plain">Plain</span></div>
+      <div class="adv-row"><span class="element-badge desert">Desert</span> beats <span class="element-badge swamp">Swamp</span> & <span class="element-badge forest">Forest</span></div>
+      <div class="adv-row"><span class="element-badge plain">Plain</span> beats <span class="element-badge desert">Desert</span> & <span class="element-badge swamp">Swamp</span></div>
+      <div class="adv-row"><span class="element-badge forest">Forest</span> beats <span class="element-badge mountain">Mountain</span> & <span class="element-badge plain">Plain</span></div>
+      <div class="adv-row"><span class="element-badge swamp">Swamp</span> beats <span class="element-badge ocean">Ocean</span> & <span class="element-badge mountain">Mountain</span></div>
+    </div>
+  </div>
+
+  <!-- Result Overlay -->
+  <div class="result-overlay" id="resultOverlay">
+    <div class="result-box">
+      <h2 id="resultTitle">Victory!</h2>
+      <div class="final-score" id="finalScore">5 - 4</div>
+      <button onclick="requestRematch()">Rematch</button>
+      <button onclick="returnToLobby()" style="margin-left:12px; background:#555;">Leave</button>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let myPlayer = null;
+    let selectedCardId = null;
+    let gameState = null;
+    let roomId = null;
+    let playerNames = {};
+    let pingInterval = null;
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function generateRoomId() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let id = '';
+      for (let i = 0; i < 5; i++) id += chars[Math.floor(Math.random() * chars.length)];
+      return id;
+    }
+
+    function joinGame() {
+      const name = document.getElementById('playerName').value.trim() || 'Player';
+      roomId = document.getElementById('roomCode').value.trim().toUpperCase() || generateRoomId();
+
+      document.getElementById('lobby').style.display = 'none';
+      document.getElementById('game').classList.add('active');
+      document.getElementById('roomDisplay').textContent = roomId;
+      document.getElementById('waitingOverlay').classList.add('active');
+
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}/api/room/${roomId}/ws?name=${encodeURIComponent(name)}`);
+
+      ws.onmessage = handleMessage;
+      ws.onclose = () => showToast('Disconnected from server');
+      ws.onerror = () => showToast('Connection error');
+
+      // Keep-alive ping every 30s (clear previous interval if any)
+      if (pingInterval) clearInterval(pingInterval);
+      pingInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send('ping');
+      }, 30000);
+
+      initBoard();
+    }
+
+    function handleMessage(event) {
+      if (event.data === 'pong') return;
+      const data = JSON.parse(event.data);
+
+      switch (data.type) {
+        case 'joined':
+          myPlayer = data.player;
+          playerNames = data.playerNames;
+          document.getElementById('myHandTitle').textContent = data.name;
+          break;
+
+        case 'opponent_joined':
+          playerNames = data.playerNames;
+          document.getElementById('oppHandTitle').textContent = data.name;
+          showToast(`${data.name} joined!`);
+          break;
+
+        case 'opponent_left':
+          showToast('Opponent disconnected');
+          document.getElementById('waitingOverlay').classList.add('active');
+          document.getElementById('statusText').textContent = 'Opponent left. Waiting...';
+          gameState = null;
+          selectedCardId = null;
+          renderBoard();
+          renderHands();
+          break;
+
+        case 'state':
+          gameState = data;
+          document.getElementById('waitingOverlay').classList.remove('active');
+          renderAll();
+          break;
+
+        case 'error':
+          showToast(data.message);
+          break;
+      }
+    }
+
+    function initBoard() {
+      const board = document.getElementById('board');
+      // Remove existing cells
+      board.querySelectorAll('.cell').forEach(c => c.remove());
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.index = i;
+        cell.onclick = () => onCellClick(i);
+        board.insertBefore(cell, document.getElementById('waitingOverlay'));
+      }
+    }
+
+    function renderAll() {
+      if (!gameState) return;
+      renderBoard();
+      renderHands();
+      renderStatus();
+      checkResult();
+    }
+
+    function renderBoard() {
+      const cells = document.querySelectorAll('.cell');
+      cells.forEach((cell, i) => {
+        cell.innerHTML = '';
+        cell.classList.remove('occupied', 'valid-target', 'captured');
+
+        if (gameState && gameState.board[i]) {
+          const placed = gameState.board[i];
+          cell.classList.add('occupied');
+          cell.appendChild(createCardElement(placed.card, placed.owner, false));
+
+          // Flash captured cells
+          if (gameState.lastCaptures && gameState.lastCaptures.includes(i)) {
+            cell.classList.add('captured');
+          }
+        } else if (selectedCardId !== null && gameState && gameState.currentPlayer === gameState.myPlayer) {
+          cell.classList.add('valid-target');
+        }
+      });
+    }
+
+    function renderHands() {
+      const myHandEl = document.getElementById('myHand');
+      const oppHandEl = document.getElementById('oppHand');
+      myHandEl.innerHTML = '';
+      oppHandEl.innerHTML = '';
+
+      if (!gameState) return;
+
+      // My hand
+      if (gameState.myHand) {
+        for (const card of gameState.myHand) {
+          const el = createCardElement(card, gameState.myPlayer, true);
+          el.classList.add('hand-card');
+          el.classList.remove('card');
+          if (selectedCardId === card.id) el.classList.add('selected');
+          el.onclick = (e) => {
+            e.stopPropagation();
+            onHandCardClick(card.id);
+          };
+          myHandEl.appendChild(el);
+        }
+      }
+
+      // Opponent hand (face down)
+      const oppCount = gameState.opponentHandCount || 0;
+      const oppPlayer = gameState.myPlayer === 0 ? 1 : 0;
+      for (let i = 0; i < oppCount; i++) {
+        const el = document.createElement('div');
+        el.className = `hand-card facedown owner-${oppPlayer}`;
+        el.innerHTML = '<div style="font-size:1.5em;">?</div>';
+        oppHandEl.appendChild(el);
+      }
+    }
+
+    function renderStatus() {
+      if (!gameState) return;
+
+      document.getElementById('score0').textContent = gameState.scores[0];
+      document.getElementById('score1').textContent = gameState.scores[1];
+
+      const isMyTurn = gameState.currentPlayer === gameState.myPlayer;
+      const statusEl = document.getElementById('statusText');
+
+      if (gameState.phase === 'finished') {
+        statusEl.textContent = 'Game Over!';
+      } else if (gameState.phase === 'playing') {
+        statusEl.innerHTML = isMyTurn
+          ? '<span class="turn-indicator" style="color:var(--accent)">Your turn!</span>'
+          : '<span class="turn-indicator">Opponent\'s turn...</span>';
+      } else {
+        statusEl.textContent = 'Waiting for opponent...';
+      }
+    }
+
+    function checkResult() {
+      if (!gameState || gameState.phase !== 'finished') {
+        document.getElementById('resultOverlay').classList.remove('active');
+        return;
+      }
+
+      const overlay = document.getElementById('resultOverlay');
+      const title = document.getElementById('resultTitle');
+      const score = document.getElementById('finalScore');
+
+      score.textContent = `${gameState.scores[0]} - ${gameState.scores[1]}`;
+
+      if (gameState.winner === 'draw') {
+        title.textContent = 'Draw!';
+        title.style.color = '#eee';
+      } else if (gameState.winner === gameState.myPlayer) {
+        title.textContent = 'Victory!';
+        title.style.color = '#4CAF50';
+      } else {
+        title.textContent = 'Defeat';
+        title.style.color = '#e94560';
+      }
+
+      overlay.classList.add('active');
+    }
+
+    function createCardElement(card, owner, isHand) {
+      const el = document.createElement('div');
+      el.className = `${isHand ? 'hand-card' : 'card'} owner-${owner}`;
+
+      let elementsHtml = '';
+      if (card.elements) {
+        elementsHtml = card.elements.map(e =>
+          `<span class="element-badge ${e}">${e.slice(0,3)}</span>`
+        ).join('');
+      }
+
+      el.innerHTML = `
+        <div class="card-name">${escapeHtml(card.name)}</div>
+        <div class="card-values">
+          <span class="v-top">${card.top}</span>
+          <span class="v-left">${card.left}</span>
+          <span class="v-center"></span>
+          <span class="v-right">${card.right}</span>
+          <span class="v-bottom">${card.bottom}</span>
+        </div>
+        <div class="card-elements">${elementsHtml}</div>
+      `;
+      return el;
+    }
+
+    function onHandCardClick(cardId) {
+      if (!gameState || gameState.phase !== 'playing') return;
+      if (gameState.currentPlayer !== gameState.myPlayer) {
+        showToast("Not your turn!");
+        return;
+      }
+      selectedCardId = selectedCardId === cardId ? null : cardId;
+      renderAll();
+    }
+
+    function onCellClick(cellIndex) {
+      if (!gameState || gameState.phase !== 'playing') return;
+      if (gameState.currentPlayer !== gameState.myPlayer) return;
+      if (selectedCardId === null) {
+        showToast('Select a card first');
+        return;
+      }
+      if (gameState.board[cellIndex]) return;
+
+      ws.send(JSON.stringify({
+        type: 'place_card',
+        cardId: selectedCardId,
+        cellIndex,
+      }));
+
+      selectedCardId = null;
+    }
+
+    function requestRematch() {
+      document.getElementById('resultOverlay').classList.remove('active');
+      ws.send(JSON.stringify({ type: 'rematch' }));
+    }
+
+    function returnToLobby() {
+      document.getElementById('resultOverlay').classList.remove('active');
+      document.getElementById('game').classList.remove('active');
+      document.getElementById('lobby').style.display = '';
+      if (ws) { ws.close(); ws = null; }
+      if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+      gameState = null;
+      selectedCardId = null;
+      myPlayer = null;
+    }
+
+    function showToast(message) {
+      const existing = document.querySelector('.toast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }
+
+    // Click anywhere to deselect card
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.hand-card') && !e.target.closest('.cell')) {
+        if (selectedCardId !== null) {
+          selectedCardId = null;
+          renderAll();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
