@@ -65,43 +65,20 @@
 
   .card-label {
     position: absolute;
-    bottom: 0;
+    bottom: 14%;
     left: 0;
     right: 0;
-    padding: 24px 10px 10px;
-    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 0;
     text-align: center;
+    pointer-events: none;
   }
 
   .card-label .name {
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 0.85rem;
     color: #fff;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7);
   }
-
-  .card-label .elements {
-    margin-top: 4px;
-    display: flex;
-    justify-content: center;
-    gap: 4px;
-  }
-
-  .element-badge {
-    font-size: 0.65rem;
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .element-badge.ocean    { background: #1a6b8a; color: #b3e0f2; }
-  .element-badge.mountain { background: #6b5b3a; color: #d4c5a0; }
-  .element-badge.desert   { background: #8a6b1a; color: #f2e0b3; }
-  .element-badge.plain    { background: #3a6b1a; color: #c0e0a0; }
-  .element-badge.swamp    { background: #2a5a4a; color: #a0d4c0; }
-  .element-badge.forest   { background: #1a5a2a; color: #a0d4a8; }
 
   .card-id {
     position: absolute;
@@ -256,17 +233,7 @@ CARDS.forEach(card => {
   name.className = 'name';
   name.textContent = card.name;
 
-  const elements = document.createElement('div');
-  elements.className = 'elements';
-  card.elements.forEach(e => {
-    const badge = document.createElement('span');
-    badge.className = `element-badge ${e}`;
-    badge.textContent = e;
-    elements.appendChild(badge);
-  });
-
   label.appendChild(name);
-  label.appendChild(elements);
   div.appendChild(img);
   div.appendChild(idSpan);
   div.appendChild(label);
