@@ -108,3 +108,58 @@ export function getRandomHand(exclude: number[] = []): Card[] {
   }
   return hand;
 }
+
+function randomStat(): number {
+  return Math.floor(Math.random() * 10); // 0-9
+}
+
+function sumStats(cards: Card[]): number {
+  return cards.reduce((s, c) => s + c.top + c.right + c.bottom + c.left, 0);
+}
+
+function assignRandomStats(card: Card): Card {
+  return {
+    ...card,
+    top: randomStat(),
+    right: randomStat(),
+    bottom: randomStat(),
+    left: randomStat(),
+  };
+}
+
+/**
+ * Deal 10 random cards split into 2 balanced hands of 5.
+ * Both hands will have the same total stat points.
+ * Stats are random 0-9, elements/names come from ALL_CARDS.
+ */
+export function generateBalancedHands(): [Card[], Card[]] {
+  // Shuffle and pick 10
+  const shuffled = [...ALL_CARDS].sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, 10);
+
+  // Assign random stats to hand 0
+  const hand0 = picked.slice(0, 5).map(assignRandomStats);
+  // Assign random stats to hand 1
+  let hand1 = picked.slice(5, 10).map(assignRandomStats);
+
+  const targetSum = sumStats(hand0);
+  let currentSum = sumStats(hand1);
+
+  // Adjust hand1 stats to match hand0's total
+  const sides: ('top' | 'right' | 'bottom' | 'left')[] = ['top', 'right', 'bottom', 'left'];
+  let iterations = 0;
+  while (currentSum !== targetSum && iterations < 1000) {
+    iterations++;
+    const cardIdx = Math.floor(Math.random() * 5);
+    const side = sides[Math.floor(Math.random() * 4)];
+    if (currentSum < targetSum && hand1[cardIdx][side] < 9) {
+      hand1[cardIdx] = { ...hand1[cardIdx], [side]: hand1[cardIdx][side] + 1 };
+      currentSum++;
+    } else if (currentSum > targetSum && hand1[cardIdx][side] > 0) {
+      hand1[cardIdx] = { ...hand1[cardIdx], [side]: hand1[cardIdx][side] - 1 };
+      currentSum--;
+    }
+  }
+
+  return [hand0, hand1];
+}

@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { GameState, createGame, placeCard, serializeForPlayer, Player } from './game';
-import { getRandomHand, ALL_CARDS } from './cards';
+import { generateBalancedHands, ALL_CARDS } from './cards';
 
 interface Env {
   GAME_ROOM: DurableObjectNamespace<GameRoom>;
@@ -136,9 +136,7 @@ export class GameRoom extends DurableObject<Env> {
   }
 
   private startGame() {
-    const hand0 = getRandomHand();
-    const hand0Ids = hand0.map(c => c.id);
-    const hand1 = getRandomHand(hand0Ids);
+    const [hand0, hand1] = generateBalancedHands();
 
     const state = createGame();
     state.hands = [hand0, hand1];
