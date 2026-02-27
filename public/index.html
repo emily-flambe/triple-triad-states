@@ -354,13 +354,12 @@
 
   <!-- Lobby -->
   <div id="lobby">
-    <h2>Join a Game</h2>
+    <h2>Play</h2>
     <input id="playerName" placeholder="Your name" maxlength="20" />
+    <button onclick="playBot()">Play vs Bot</button>
+    <div style="font-size:0.8em; color:var(--text-dim); margin:4px 0;">or play with a friend</div>
     <input id="roomCode" placeholder="Room code (or leave blank)" maxlength="20" />
-    <button onclick="joinGame()">Play</button>
-    <p style="font-size:0.8em; color:var(--text-dim); max-width:280px; text-align:center; margin-top:8px;">
-      Share the room code with a friend to play together, or leave blank for a random room.
-    </p>
+    <button onclick="joinGame()" style="background:#555;">Multiplayer</button>
   </div>
 
   <!-- Game -->
@@ -698,6 +697,12 @@
       }
       if (gameState.board[cellIndex]) return;
 
+      if (botMode) {
+        botPlaceCard(0, selectedCardId, cellIndex);
+        selectedCardId = null;
+        return;
+      }
+
       ws.send(JSON.stringify({
         type: 'place_card',
         cardId: selectedCardId,
@@ -709,6 +714,10 @@
 
     function requestRematch() {
       document.getElementById('resultOverlay').classList.remove('active');
+      if (botMode) {
+        startBotGame();
+        return;
+      }
       ws.send(JSON.stringify({ type: 'rematch' }));
     }
 
@@ -721,6 +730,8 @@
       gameState = null;
       selectedCardId = null;
       myPlayer = null;
+      botMode = false;
+      botFullState = null;
     }
 
     function showToast(message) {
@@ -732,6 +743,317 @@
       toast.textContent = message;
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 2500);
+    }
+
+    // =============================================
+    // BOT MODE — client-side game engine + AI
+    // =============================================
+    let botMode = false;
+    let botFullState = null;
+    let allCards = null;
+
+    // Element advantages (same as server)
+    const ELEMENT_ADV = {
+      ocean: ['desert', 'forest'],
+      mountain: ['ocean', 'plain'],
+      desert: ['swamp', 'forest'],
+      plain: ['desert', 'swamp'],
+      forest: ['mountain', 'plain'],
+      swamp: ['ocean', 'mountain'],
+    };
+
+    function localHasAdvantage(atkElements, defElements) {
+      for (const atk of atkElements) {
+        for (const def of defElements) {
+          if (ELEMENT_ADV[atk] && ELEMENT_ADV[atk].includes(def)) return true;
+        }
+      }
+      return false;
+    }
+
+    function localGetAdjacencies(index) {
+      const row = Math.floor(index / 3);
+      const col = index % 3;
+      const adj = [];
+      if (row > 0) adj.push({ cellIndex: index - 3, mySide: 0, theirSide: 2 });
+      if (col < 2) adj.push({ cellIndex: index + 1, mySide: 1, theirSide: 3 });
+      if (row < 2) adj.push({ cellIndex: index + 3, mySide: 2, theirSide: 0 });
+      if (col > 0) adj.push({ cellIndex: index - 1, mySide: 3, theirSide: 1 });
+      return adj;
+    }
+
+    function localGetSideValue(card, side) {
+      return [card.top, card.right, card.bottom, card.left][side];
+    }
+
+    function localResolveCaptures(board, placedIndex, player) {
+      const placed = board[placedIndex];
+      const captures = [];
+      const adjacencies = localGetAdjacencies(placedIndex);
+
+      // Basic captures
+      for (const adj of adjacencies) {
+        const neighbor = board[adj.cellIndex];
+        if (!neighbor || neighbor.owner === player) continue;
+        let myVal = localGetSideValue(placed.card, adj.mySide);
+        let theirVal = localGetSideValue(neighbor.card, adj.theirSide);
+        if (localHasAdvantage(placed.card.elements, neighbor.card.elements)) myVal += 1;
+        if (localHasAdvantage(neighbor.card.elements, placed.card.elements)) theirVal += 1;
+        if (myVal > theirVal) captures.push(adj.cellIndex);
+      }
+
+      // Same rule
+      const sameMatches = [];
+      for (const adj of adjacencies) {
+        const neighbor = board[adj.cellIndex];
+        if (!neighbor) continue;
+        if (localGetSideValue(placed.card, adj.mySide) === localGetSideValue(neighbor.card, adj.theirSide)) {
+          sameMatches.push(adj.cellIndex);
+        }
+      }
+      if (sameMatches.length >= 2) {
+        for (const ci of sameMatches) {
+          if (board[ci] && board[ci].owner !== player && !captures.includes(ci)) captures.push(ci);
+        }
+      }
+
+      // Plus rule
+      const plusSums = [];
+      for (const adj of adjacencies) {
+        const neighbor = board[adj.cellIndex];
+        if (!neighbor) continue;
+        plusSums.push({
+          sum: localGetSideValue(placed.card, adj.mySide) + localGetSideValue(neighbor.card, adj.theirSide),
+          cellIndex: adj.cellIndex,
+        });
+      }
+      const sumCounts = new Map();
+      for (const ps of plusSums) {
+        const arr = sumCounts.get(ps.sum) || [];
+        arr.push(ps.cellIndex);
+        sumCounts.set(ps.sum, arr);
+      }
+      for (const [, cells] of sumCounts) {
+        if (cells.length >= 2) {
+          for (const ci of cells) {
+            if (board[ci] && board[ci].owner !== player && !captures.includes(ci)) captures.push(ci);
+          }
+        }
+      }
+
+      // Combo
+      if (captures.length > 0) {
+        const queue = [...captures];
+        const visited = new Set(captures);
+        while (queue.length > 0) {
+          const capIdx = queue.shift();
+          const capCard = board[capIdx];
+          if (!capCard) continue;
+          for (const adj of localGetAdjacencies(capIdx)) {
+            if (adj.cellIndex === placedIndex || visited.has(adj.cellIndex)) continue;
+            const neighbor = board[adj.cellIndex];
+            if (!neighbor || neighbor.owner === player) continue;
+            if (localGetSideValue(capCard.card, adj.mySide) > localGetSideValue(neighbor.card, adj.theirSide)) {
+              captures.push(adj.cellIndex);
+              visited.add(adj.cellIndex);
+              queue.push(adj.cellIndex);
+            }
+          }
+        }
+      }
+
+      return captures;
+    }
+
+    function localPlaceCard(state, player, cardId, cellIndex) {
+      const handIdx = state.hands[player].findIndex(c => c.id === cardId);
+      if (handIdx === -1) return null;
+
+      const card = state.hands[player][handIdx];
+      const newBoard = [...state.board];
+      const newHands = [
+        [...state.hands[0]],
+        [...state.hands[1]],
+      ];
+      newHands[player].splice(handIdx, 1);
+      newBoard[cellIndex] = { card, owner: player };
+
+      const captures = localResolveCaptures(newBoard, cellIndex, player);
+      for (const ci of captures) {
+        if (newBoard[ci]) newBoard[ci] = { card: newBoard[ci].card, owner: player };
+      }
+
+      let p0 = 0, p1 = 0;
+      for (const cell of newBoard) {
+        if (cell) { if (cell.owner === 0) p0++; else p1++; }
+      }
+      p0 += newHands[0].length;
+      p1 += newHands[1].length;
+
+      const boardFull = newBoard.every(c => c !== null);
+      let winner = null;
+      let phase = 'playing';
+      if (boardFull) {
+        phase = 'finished';
+        if (p0 > p1) winner = 0;
+        else if (p1 > p0) winner = 1;
+        else winner = 'draw';
+      }
+
+      return {
+        board: newBoard,
+        hands: newHands,
+        currentPlayer: boardFull ? player : (player === 0 ? 1 : 0),
+        phase,
+        scores: [p0, p1],
+        winner,
+        lastCaptures: captures,
+        elementalBonus: true,
+      };
+    }
+
+    function localRandomStat() { return Math.floor(Math.random() * 10); }
+
+    function localGenerateBalancedHands(cards) {
+      const shuffled = [...cards].sort(() => Math.random() - 0.5);
+      const picked = shuffled.slice(0, 10);
+      const hand0 = picked.slice(0, 5).map(c => ({
+        ...c, top: localRandomStat(), right: localRandomStat(), bottom: localRandomStat(), left: localRandomStat(),
+      }));
+      const hand1 = picked.slice(5, 10).map(c => ({
+        ...c, top: localRandomStat(), right: localRandomStat(), bottom: localRandomStat(), left: localRandomStat(),
+      }));
+
+      const sum = cards => cards.reduce((s, c) => s + c.top + c.right + c.bottom + c.left, 0);
+      const target = sum(hand0);
+      let current = sum(hand1);
+      const sides = ['top', 'right', 'bottom', 'left'];
+      let iter = 0;
+      while (current !== target && iter < 1000) {
+        iter++;
+        const ci = Math.floor(Math.random() * 5);
+        const side = sides[Math.floor(Math.random() * 4)];
+        if (current < target && hand1[ci][side] < 9) { hand1[ci] = { ...hand1[ci], [side]: hand1[ci][side] + 1 }; current++; }
+        else if (current > target && hand1[ci][side] > 0) { hand1[ci] = { ...hand1[ci], [side]: hand1[ci][side] - 1 }; current--; }
+      }
+      return [hand0, hand1];
+    }
+
+    // Bot AI: score every possible move, pick the best
+    function scoreBotMove(state, cardId, cellIndex) {
+      const result = localPlaceCard(state, 1, cardId, cellIndex);
+      if (!result) return -999;
+
+      let score = result.lastCaptures.length * 10;
+
+      // Prefer center, then edges, then corners
+      const posBonus = [1, 2, 1, 2, 3, 2, 1, 2, 1];
+      score += posBonus[cellIndex];
+
+      // Defensive: penalize exposed weak sides
+      const card = state.hands[1].find(c => c.id === cardId);
+      for (const adj of localGetAdjacencies(cellIndex)) {
+        if (!result.board[adj.cellIndex]) {
+          // Empty neighbor — our side is exposed
+          const val = localGetSideValue(card, adj.mySide);
+          if (val <= 2) score -= 2;
+          else if (val >= 7) score += 1;
+        }
+      }
+
+      return score;
+    }
+
+    function doBotTurn() {
+      if (!botFullState || botFullState.phase !== 'playing' || botFullState.currentPlayer !== 1) return;
+
+      const hand = botFullState.hands[1];
+      const emptyCells = [];
+      for (let i = 0; i < 9; i++) {
+        if (!botFullState.board[i]) emptyCells.push(i);
+      }
+
+      let bestScore = -Infinity;
+      let bestCard = null;
+      let bestCell = null;
+
+      for (const card of hand) {
+        for (const cell of emptyCells) {
+          const s = scoreBotMove(botFullState, card.id, cell);
+          if (s > bestScore) {
+            bestScore = s;
+            bestCard = card.id;
+            bestCell = cell;
+          }
+        }
+      }
+
+      if (bestCard !== null && bestCell !== null) {
+        botPlaceCard(1, bestCard, bestCell);
+      }
+    }
+
+    function botPlaceCard(player, cardId, cellIndex) {
+      const result = localPlaceCard(botFullState, player, cardId, cellIndex);
+      if (!result) return;
+      botFullState = result;
+      syncBotState();
+    }
+
+    function syncBotState() {
+      gameState = {
+        board: botFullState.board,
+        myHand: botFullState.hands[0],
+        opponentHandCount: botFullState.hands[1].length,
+        currentPlayer: botFullState.currentPlayer,
+        phase: botFullState.phase,
+        scores: botFullState.scores,
+        winner: botFullState.winner,
+        lastCaptures: botFullState.lastCaptures,
+        myPlayer: 0,
+      };
+      renderAll();
+
+      if (botFullState.phase === 'playing' && botFullState.currentPlayer === 1) {
+        setTimeout(doBotTurn, 600);
+      }
+    }
+
+    function startBotGame() {
+      const [hand0, hand1] = localGenerateBalancedHands(allCards);
+      botFullState = {
+        board: new Array(9).fill(null),
+        hands: [hand0, hand1],
+        currentPlayer: 0,
+        phase: 'playing',
+        scores: [5, 5],
+        winner: null,
+        lastCaptures: [],
+        elementalBonus: true,
+      };
+      selectedCardId = null;
+      document.getElementById('waitingOverlay').classList.remove('active');
+      syncBotState();
+    }
+
+    async function playBot() {
+      const name = document.getElementById('playerName').value.trim() || 'Player';
+      botMode = true;
+      myPlayer = 0;
+
+      if (!allCards) {
+        const res = await fetch('/api/cards');
+        allCards = await res.json();
+      }
+
+      document.getElementById('lobby').style.display = 'none';
+      document.getElementById('game').classList.add('active');
+      document.getElementById('roomDisplay').textContent = 'vs Bot';
+      document.getElementById('myHandTitle').textContent = name;
+      document.getElementById('oppHandTitle').textContent = 'Bot';
+
+      initBoard();
+      startBotGame();
     }
 
     // Click anywhere to deselect card
